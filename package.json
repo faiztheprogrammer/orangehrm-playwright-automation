@@ -1,0 +1,30 @@
+{
+  "name": "playwright-practice",
+  "version": "1.0.0",
+  "description": "OrangeHRM UI and API automation portfolio using Playwright Test and JavaScript",
+  "license": "ISC",
+  "author": "Faiz",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:login": "playwright test tests/login.spec.js",
+    "test:login:headed": "playwright test tests/login.spec.js --headed",
+    "test:users": "playwright test tests/user.spec.js",
+    "test:api": "playwright test tests/api/users.api.spec.js --grep-invert \"hybrid flow:\"",
+    "test:hybrid": "playwright test tests/api/users.api.spec.js --grep \"hybrid flow:\"",
+    "test:list": "playwright test --list",
+    "browsers:install": "playwright install chromium",
+    "report": "playwright show-report"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "playwright": "^1.63.0",
+    "playwright-core": "^1.63.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
+}
