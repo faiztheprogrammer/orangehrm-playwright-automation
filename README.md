@@ -1,149 +1,80 @@
 # OrangeHRM Playwright automation
 
-A QA automation portfolio project using JavaScript, Playwright Test, Page Object Model, UI tests, API tests, and the public [OrangeHRM demo](https://opensource-demo.orangehrmlive.com/).
+A junior QA automation portfolio project using JavaScript, Playwright Test, Page Object Model, and Allure 2 reports against the public [OrangeHRM demo](https://opensource-demo.orangehrmlive.com/). This is a demonstration project, not a claim of production testing experience.
 
-The project demonstrates authentication, user management, API contracts, test-owned data, and failure diagnostics. It is a demo project, not production testing experience.
+## Setup
 
-## Requirements and installation
-
-- Node.js 20 or newer; GitHub Actions uses Node.js 22.
-- npm, Git, and network access to the demo and Playwright browser downloads.
-- Bundled Chromium; branded Google Chrome is not required.
+Requirements: Node.js 22, npm, Java 17 on PATH (for Allure 2), and internet access.
 
 ```sh
 git clone https://github.com/faiztheprogrammer/orangehrm-playwright-automation.git
 cd orangehrm-playwright-automation
 npm ci
-npm run browsers:install
+npx playwright install chromium
 ```
 
-On Linux, install browser system libraries too:
+On Linux, use `npx playwright install --with-deps chromium` to install browser system dependencies too. On Windows PowerShell, use `npm.cmd` and `npx.cmd` if execution policy blocks the PowerShell launchers.
+
+## Run tests
 
 ```sh
-npx playwright install --with-deps chromium
+npm test
+npx playwright test --headed
+npx playwright test tests/login.spec.js
+npx playwright test tests/users.spec.js
+npx playwright test tests/api.spec.js
+npx playwright test --list
 ```
 
-Use `npm ci` for the versions recorded in `package-lock.json`. The demo's published Admin credentials are used in tests; no private account or GitHub secret is required. Do not replace these with production credentials.
+Run one suite at a time. Configuration uses Chromium, one worker, zero retries, a 60-second test timeout, and a 10-second assertion timeout. The lifecycle test creates and deletes its own account in the shared demo. Tests use only the demo's public Admin/admin123 credentials.
 
-## Running tests
+## Coverage: 10 tests
 
-| Command | Scope |
+| Area | Coverage |
 | --- | --- |
-| `npm run test:list` | Discover tests without executing them |
-| `npm test` | All 18 tests, including account creation/edit/deletion |
-| `npm run test:login` | Six non-mutating login tests |
-| `npm run test:login:headed` | Login tests with a visible Chromium window |
-| `npm run test:users` | Five System Users UI tests, including owned-account setup/CRUD |
-| `npm run test:api` | Six API tests, including CRUD and cleanup regression |
-| `npm run test:hybrid` | One API-setup/UI-verification test |
-| `npm run report` | Explicitly open the latest HTML report |
+| Login (4) | Successful login, invalid password, both credentials required, logout |
+| Users (3) | Missing-username search and Reset; create/search/edit/delete journey; empty Add User form validation |
+| API (3) | Unauthenticated users request returns 401; authenticated Admin search; missing-user lookup returns 404 |
 
-Tests use one worker and zero retries. Do not launch multiple local suites concurrently against the shared demo. On Windows PowerShell, `npm.cmd` and `npx.cmd` can be used if execution policy blocks the `.ps1` shims. Prefer the dedicated scripts over forwarding extra npm arguments.
+The authenticated API tests use UI login and `page.context().request` to share browser cookies. They test API responses but do not demonstrate API-only authentication. The missing-record test assumes its deliberately large ID does not exist in this demo.
 
-For one specific API test:
-
-```sh
-npx playwright test tests/api/users.api.spec.js --grep "crud lifecycle: create, read, update, and delete user via API$"
-```
-
-In PowerShell, use `npx.cmd` for that command. To debug one UI test, use Playwright's `--debug` option with its file and a narrow `--grep`. Confirm selection with `--list` first. Debugging or rerunning a mutating test creates a new account; allow teardown to complete before exiting.
-
-## Structure and responsibilities
+## Project structure
 
 ```text
-.github/workflows/playwright.yml   GitHub Actions test execution and artifacts
-pages/
-  LoginPage.js                    Login controls, field errors, and actions
-  AdminPage.js                    System Users list, filters, and user form actions
-tests/
-  login.spec.js                   Six login scenarios
-  user.spec.js                    Five user-management UI scenarios
-  api/users.api.spec.js           Six API scenarios and one hybrid scenario
-utils/
-  apiAuth.js                      API login, employee prerequisites, owned-user cleanup
-playwright.config.js             Chromium, serial execution, timeouts, diagnostics
-package.json                     Dependencies and supported run commands
-package-lock.json                Reproducible dependency versions
-README.md                        Current setup, scope, and limitations
+pages/LoginPage.js                  Login controls and actions
+pages/AdminPage.js                  User search, form controls, edit and deletion
+tests/login.spec.js                 Authentication scenarios
+tests/users.spec.js                 User scenarios and lifecycle cleanup hook
+tests/api.spec.js                   API response checks
+playwright.config.js               Runner settings and Allure reporter
+.github/workflows/playwright.yml    GitHub Actions execution and report artifacts
 ```
 
-Specs keep business assertions. Page objects keep application locators and actions. Small test-scoped cleanup fixtures remain in the specs; there is no generic base page or additional framework layer. The CommonJS config and Playwright-transformed JavaScript imports work through the Playwright runner.
+Tests express expected results; page objects hold locators and reusable actions. The employee autocomplete must select a suggestion, not just type a name. The selected name assertion normalizes whitespace because suggestion text and the input can format spaces differently.
 
-`scratch/` and root HTML/screenshot investigation files are ignored development artifacts. They are not part of the suite and should not be used as run commands. `ANTIGRAVITY_HANDOVER_PLAYWRIGHT_ORANGEHRM.md` is historical development guidance, not the current setup documentation.
-
-## Coverage
-
-| Area | Scenarios |
-| --- | --- |
-| Login (6) | Success; wrong password; wrong username; missing username; missing password; both fields missing |
-| System Users UI (5) | Create/search/edit/delete lifecycle; missing-user search and Reset; required fields; role/status matching and exclusion with Reset; password-confirmation mismatch |
-| API (6) | Unauthenticated access; bounded paginated user list; missing record; empty creation payload validation; CRUD with a read after update; cleanup after a simulated post-creation failure |
-| Hybrid (1) | API-created user verified in the UI by exact username, ESS role, and Enabled status; API teardown |
-
-The full UI lifecycle is retained as a smoke journey. These are not exhaustive independent tests for every field or CRUD combination. The form's observed empty-confirmation message is `Passwords do not match`; the tests preserve the actual demo behavior.
-
-## Reliability and cleanup
-
-- Role/placeholder locators are preferred. Field groups are scoped by labels; CSS is used for custom controls and unnamed icon buttons.
-- Table actions use rows containing an exact username cell, not a substring of the row's combined text.
-- Search and Reset wait for the corresponding successful API response before inspecting results, reducing stale-state false positives.
-- Login validates each field's own error. API login validates the CSRF prerequisite, Dashboard redirect, and authenticated users response without printing tokens.
-- Employee setup selects a usable active employee from validated API data. The UI selects that employee's exact full autocomplete name. The suite never creates or deletes employees.
-- Generated usernames include random suffixes. A creation response must contain a positive integer ID and the exact generated name before it is registered for cleanup.
-- Teardown runs on success and failure before the dependent request context closes. A GET checks ownership by ID and original/planned updated name before deleting. DELETE must return 200 and a follow-up GET must return 404. Already absent records are accepted after a 404.
-- Generated IDs and cleanup outcomes appear in report annotations. Cleanup errors are reported separately; they fail an otherwise passing test and preserve an existing workflow failure.
-- The cleanup regression deliberately throws a local workflow error after creating an owned account, checks that the same error is preserved, and verifies the account is absent. An outer cleanup fixture provides a fallback. This test should pass normally; it is not an expected-failure or skipped test.
-
-## Reports and debugging
-
-The console prints test results. HTML output is written to `playwright-report/` and never opens automatically. `npm run report` serves the latest report. Each execution replaces the previous report/results; preserve a copy before another run if needed.
-
-Failure screenshots and local retained failure traces are written under `test-results/`. Open a trace from the report, or run:
+## Allure reporting
 
 ```sh
-npx playwright show-trace path/to/trace.zip
+npx allure generate allure-results --clean -o allure-report
+npx allure open allure-report
 ```
 
-Check the failing assertion and its call log, screenshot, request status, and `created-user`/`user-cleanup` annotations. Cleanup problems have a `user-cleanup-errors` attachment. No arbitrary sleeps or blanket retries are used.
+`allure-results/` contains raw test data; `allure-report/` contains the generated HTML report. The generator's `--clean` replaces the generated report, not raw results. Before a new independent local run, remove or move aside the previous `allure-results/` directory; otherwise multiple runs can appear as retries/history. Preserve old results first if needed. Generated output and installed packages are Git-ignored.
 
-Local traces can contain authentication cookies, CSRF tokens, and network payloads. Keep them local and inspect/redact them before sharing. Generated reports/results are Git-ignored. CI disables network traces and uploads HTML reports, failure screenshots, and cleanup diagnostics; it does not upload auth state or print credential/token dumps. Only the demo's public credentials are present in source.
+Allure includes test actions and failure context. Inspect the failing assertion, expected/actual values, and call log. To investigate a failure with a browser trace, run a selected test with `--trace on` and open the resulting ZIP with `npx playwright show-trace <path-to-trace.zip>`. Traces are not enabled by default. Reports and traces may contain demo data and session information; inspect them before sharing.
 
-## GitHub Actions
+## CI
 
-`.github/workflows/playwright.yml` runs on pushes/PRs to `main` or `master`, and manual dispatch. It uses Node.js 22, `npm ci`, and `npx playwright install --with-deps chromium`, then runs `npm test`. The workflow has read-only repository permissions, one test worker, no retries, and repository-wide concurrency with cancellation disabled so competing CI runs do not interrupt cleanup.
+GitHub Actions runs on pushes and pull requests to `main`, plus manual dispatch. It installs Node.js 22, Java 17, locked npm dependencies, and Chromium with Linux libraries, then runs `npm test`. Report generation and artifact upload can run after a test failure; they do not turn a failed test run green. Repository-wide concurrency prevents overlapping CI executions and does not cancel an active run during cleanup.
 
-Report and test-result uploads run even when tests fail, with seven-day retention. Download the HTML report artifact, extract it, and serve it with `npx playwright show-report path/to/playwright-report`.
+Open the repository's Actions tab, select a run, and download `allure-report-and-results` from Artifacts. Extract it, then serve its report directory with `npx allure open <path-to-allure-report>`. Artifacts have seven-day retention. This is CI validation of tests, not application deployment.
 
-This is a CI validation pipeline; there is no application deployment because the application belongs to OrangeHRM. The workflow is prepared locally. A successful local run is not proof that the Linux/GitHub workflow passes; check the Actions tab after publishing.
+## Cleanup and shared-demo limitations
 
-## Shared-demo limitations
+The lifecycle captures the created account's returned ID. Its `afterEach` hook checks that the ID and original/planned updated username match before API deletion, and verifies absence with GET 404. If UI deletion already succeeded, a 404 lookup means cleanup is complete. Hook teardown has a separate runner budget from the test body.
 
-- Availability, response time, credentials, and seeded employees are outside this repository's control.
-- Other visitors may rename/delete an employee or account during a run. Exact matching and ownership checks reduce risk, but cannot make a shared backend fully isolated.
-- Duplicate employee display names can make UI autocomplete selection ambiguous; the test fails rather than picking an arbitrary option.
-- Lost/malformed creation responses may leave an account without a safely captured ID. Cleanup refuses unidentified records or ownership mismatches; inspect diagnostics rather than deleting by prefix.
-- Network outages, expired sessions, abrupt process termination, or CI job termination can prevent teardown. One worker and CI concurrency do not coordinate unrelated visitors or local runs.
-- Only Chromium is configured. API behavior is checked against this demo's observed contract; status codes are not generalized to other applications.
+The demo's availability, language, employee names, and seeded records can change when other visitors use it. Employee selection uses the signed-in employee's display name as search text; ambiguous suggestions fail instead of choosing an arbitrary record. Browser isolation does not isolate the shared backend. A killed process, network failure, missing creation response, or failure before capturing the ID can prevent cleanup. The suite never deletes unrelated accounts or employees. Exact text expectations assume English, and only Chromium is covered.
 
-## Verification record
+## Verification
 
-Observed on **2026-10-13**, Windows, Node.js 22.14.0, Playwright 1.63.0, bundled Chromium, one worker, zero retries:
-
-| Check | Actual result |
-| --- | --- |
-| `npm run test:list` | 18 tests discovered across three files |
-| `npm run test:login` | 6 passed, 0 failed, 32.7 seconds |
-| `npm test` | 18 passed, 0 failed/skipped/flaky, 193.6 seconds |
-| Cleanup annotations | All five created account IDs confirmed absent; hybrid, filter, and simulated-failure teardown each verified DELETE 200 then GET 404 |
-| `npm ci` | Locked installation succeeded; npm reported zero vulnerabilities at that time |
-| Workflow YAML | Parsed and checked locally for install/test/artifact steps; not executed on GitHub |
-
-No cleanup errors were reported. The simulated workflow error was intentionally caught and checked; the cleanup regression itself passed normally. The run verified fallback cleanup after that simulated error, not every failure mode such as a killed process or network outage. Failure screenshot/trace capture is configured, but the final run had no real test failures to exercise it.
-
-These are observed local results, not a claim that the public demo will always be available or that Linux CI has passed. CI remains unexecuted until the workflow is pushed and run on GitHub.
-
-## Publishing
-
-The Git remote is already configured for this repository. Review `git status` and `git diff`, stage the intended source/configuration/documentation files (including `.github/workflows/playwright.yml`), commit, and push to `main`. Do not stage reports, traces, screenshots, `node_modules/`, or scratch files. If authentication is requested, sign in with GitHub's supported Git credential flow; do not put a token in a repository file or remote URL.
-
-After pushing, open the repository's Actions tab, inspect the test run, and download its artifacts. Do not claim a green CI build until that run succeeds.
+CI status and report artifacts are available in the [Actions tab](https://github.com/faiztheprogrammer/orangehrm-playwright-automation/actions). A successful local execution alone does not establish that Linux CI passes.

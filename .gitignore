@@ -1,12 +1,6 @@
 node_modules/
 test-results/
 playwright-report/
-blob-report/
-scratch/
-/add_user_form.png
-/after_save.png
-/admin_link_html.txt
-/form_html.txt
-/row_html.txt
+allure-results/
+allure-report/
 .env
-.env.*
